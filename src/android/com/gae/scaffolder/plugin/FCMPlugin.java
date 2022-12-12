@@ -4,12 +4,14 @@ import androidx.core.app.NotificationManagerCompat;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.util.Log;
+import android.os.Bundle;
 
 import com.gae.scaffolder.plugin.interfaces.*;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.analytics.FirebaseAnalytics;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
@@ -21,12 +23,14 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.Map;
+import java.util.Iterator;
 
 public class FCMPlugin extends CordovaPlugin {
     public static String notificationEventName = "notification";
     public static String tokenRefreshEventName = "tokenRefresh";
     public static Map<String, Object> initialPushPayload;
     public static final String TAG = "FCMPlugin";
+    private FirebaseAnalytics mFirebaseAnalytics;
     private static FCMPlugin instance;
     protected Context context;
     protected static CallbackContext jsEventBridgeCallbackContext;
@@ -67,6 +71,9 @@ public class FCMPlugin extends CordovaPlugin {
 
     public void initialize(CordovaInterface cordova, CordovaWebView webView) {
         super.initialize(cordova, webView);
+        final Context context = cordova.getActivity().getApplicationContext();
+		this.mFirebaseAnalytics = FirebaseAnalytics.getInstance(context);
+		this.mFirebaseAnalytics.setAnalyticsCollectionEnabled(true);
         Log.d(TAG, "==> FCMPlugin initialize");
 
         FirebaseMessaging.getInstance().subscribeToTopic("android");
@@ -138,6 +145,28 @@ public class FCMPlugin extends CordovaPlugin {
                 this.deleteInstanceId(callbackContext);
             } else if (action.equals("hasPermission")) {
                 this.hasPermission(callbackContext);
+            } else if (action.equals("logEvent")) {
+				cordova.getThreadPool().execute(new Runnable() {
+					public void run() {
+						try{
+                                                  logEvent(callbackContext, args.getString(0), args.getJSONObject(1));
+							callbackContext.success();
+						}catch(Exception e){
+							callbackContext.error(e.getMessage());
+						}
+					}
+				});
+            } else if (action.equals("setCurrentScreen")) {
+				cordova.getActivity().runOnUiThread(new Runnable() {
+                    public void run() {
+                        try{
+                        setCurrentScreen(callbackContext, args.getString(0));
+                            callbackContext.success();
+                        }catch(Exception e){
+                            callbackContext.error(e.getMessage());
+                        }
+                    }
+			    });
             } else {
                 callbackContext.error("Method not found");
                 return false;
@@ -308,6 +337,46 @@ public class FCMPlugin extends CordovaPlugin {
         } catch (Exception e) {
             Log.d(TAG, "\tERROR sendTokenRefresh: " + e.getMessage());
         }
+    }
+
+    public void logEvent(final CallbackContext callbackContext, final String name, final JSONObject params)
+		throws JSONException {
+		final Bundle bundle = new Bundle();
+		Iterator iter = params.keys();
+		while (iter.hasNext()) {
+			String key = (String) iter.next();
+			Object value = params.get(key);
+
+			if (value instanceof Integer || value instanceof Double) {
+			    bundle.putFloat(key, ((Number) value).floatValue());
+			} else {
+			    bundle.putString(key, value.toString());
+			}
+		}
+
+		cordova.getThreadPool().execute(new Runnable() {
+			public void run() {
+                try {
+                    mFirebaseAnalytics.logEvent(name, bundle);
+                    callbackContext.success();
+                } catch (Exception e) {
+                    callbackContext.error(e.getMessage());
+                }
+			}
+		});
+	}
+
+    public void setCurrentScreen(final CallbackContext callbackContext, final String screenName) {
+		cordova.getActivity().runOnUiThread(new Runnable() {
+			public void run() {
+                try {
+                mFirebaseAnalytics.setCurrentScreen(cordova.getActivity(),screenName, null);
+                    callbackContext.success();
+                } catch (Exception e) {
+                    callbackContext.error(e.getMessage());
+                }
+			}
+		});
     }
 
     @Override

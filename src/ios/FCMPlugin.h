@@ -18,5 +18,7 @@
 - (void)notifyOfMessage:(NSData*) payload;
 - (void)appEnterBackground;
 - (void)appEnterForeground;
+- (void)logEvent:(CDVInvokedUrlCommand*)command;
+- (void)setCurrentScreen:(CDVInvokedUrlCommand*)command;
 
 @end

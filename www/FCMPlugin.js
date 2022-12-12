@@ -93,6 +93,12 @@ var FCMPlugin = (function () {
     FCMPlugin.prototype.unsubscribeFromTopic = function (topic) {
         return execAsPromise('unsubscribeFromTopic', [topic]);
     };
+    FCMPlugin.prototype.logEvent = function(eventName, eventParams, success, error){
+        return execAsPromise('logEvent', [eventName, eventParams || {}]);
+    }
+    FCMPlugin.prototype.setCurrentScreen = function(name, success, error) {
+        return execAsPromise('setCurrentScreen', [name]);
+    }
     return FCMPlugin;
 }());
 
